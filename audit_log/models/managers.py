@@ -8,7 +8,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.conf import settings
 
 from audit_log.models.fields import LastUserField
-from audit_log import settings
+from audit_log import settings as local_settings
 
 
 try:
@@ -56,7 +56,7 @@ class AuditLogManager(models.Manager):
         setattr(self.instance, '__is_%s_enabled'%self.attname, False)
 
     def is_tracking_enabled(self):
-        if settings.DISABLE_AUDIT_LOG:
+        if local_settings.DISABLE_AUDIT_LOG:
             return False
         if self.instance is None:
             raise ValueError("Tracking can only be enabled or disabled "
@@ -166,13 +166,20 @@ class AuditLog(object):
                     field.db_index = True
 
 
-                if field.rel and field.rel.related_name:
-                    field.rel.related_name = '_auditlog_%s' % field.rel.related_name
-
-
-
-
-
+                if field.remote_field and field.remote_field.related_name:
+                    field.remote_field.related_name = '_auditlog_{}_{}'.format(
+                        model._meta.model_name,
+                        field.remote_field.related_name
+                    )
+                elif field.remote_field:
+                    try:
+                        if field.remote_field.get_accessor_name():
+                            field.remote_field.related_name = '_auditlog_{}_{}'.format(
+                                model._meta.model_name,
+                                field.remote_field.get_accessor_name()
+                            )
+                    except e:
+                        pass
 
                 fields[field.name] = field
 
